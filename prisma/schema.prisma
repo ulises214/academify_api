@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "mysql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("DATABASE_SHADOW_URL")
+}
+
+enum UserRole {
+  ADMIN
+  STUDENT
+  TEACHER
+}
+
+enum CourseStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum HomeWorkStatus {
+  ACTIVE
+  CLOSED
+  OVERDUE
+}
+
+enum HomeWorkAsignmentStatus {
+  UNDELIVERED
+  DELIVERED
+  DELIVERED_LATE
+  EVALUATED
+}
+
+model AppLog {
+  id        String   @id @default(uuid())
+  request   Json
+  response  Json
+  error     String
+  timestamp DateTime
+  type      String
+  stack     Json?
+
+  @@index([type])
+}
+
+model User {
+  id    String   @id @default(uuid())
+  role  UserRole
+  email String   @unique
+  name  String
+
+  student Student?
+  teacher Teacher?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Student {
+  id String @id @default(uuid())
+
+  user   User   @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  userId String @unique
+
+  subscriptions CourseSubscription[]
+  asigments     HomeWorkAsignment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Teacher {
+  id String @id @default(uuid())
+
+  user   User   @relation(fields: [userId], references: [id], onUpdate: Cascade, onDelete: Cascade)
+  userId String @unique
+
+  courses Course[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Course {
+  id          String @id @default(uuid())
+  name        String
+  description String
+
+  teacher   Teacher @relation(fields: [teacherId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teacherId String
+
+  subscriptions CourseSubscription[]
+  homeWorks     HomeWork[]
+
+  status CourseStatus @default(ACTIVE)
+  code   String       @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, teacherId], name: "name_teacherId")
+  @@index([teacherId], name: "teacherId")
+}
+
+model CourseSubscription {
+  id String @id @default(uuid())
+
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  studentId String
+
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  courseId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, courseId], name: "studentId_courseId")
+  @@index([studentId], name: "studentId")
+}
+
+model HomeWork {
+  id          String    @id @default(uuid())
+  name        String
+  description String
+  closedAt    DateTime?
+  closeAt     DateTime
+
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  courseId String
+
+  files File[]
+
+  asignments HomeWorkAsignment[]
+
+  status HomeWorkStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, courseId], name: "name_courseId")
+  @@index([courseId], name: "courseId")
+}
+
+model HomeWorkAsignment {
+  id        String                  @id @default(uuid())
+  status    HomeWorkAsignmentStatus @default(UNDELIVERED)
+  rating    Float?
+  deliverAt DateTime?
+
+  homeWork   HomeWork @relation(fields: [homeWorkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  homeWorkId String
+
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  studentId String
+
+  files File[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([homeWorkId, studentId], name: "homeWorkId_studentId")
+  @@index([homeWorkId], name: "homeWorkId")
+}
+
+model File {
+  id   String @id @default(uuid())
+  name String
+  path String
+  size Int
+  type String
+
+  homeWork   HomeWork? @relation(fields: [homeWorkId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  homeWorkId String?
+
+  homeWorkAsignment   HomeWorkAsignment? @relation(fields: [homeWorkAsignmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  homeWorkAsignmentId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([name, homeWorkId], name: "name_homeWorkId")
+  @@index([homeWorkId], name: "homeWorkId")
+  @@index([homeWorkAsignmentId], name: "homeWorkAsignmentId")
+}
